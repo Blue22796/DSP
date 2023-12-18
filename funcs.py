@@ -89,7 +89,7 @@ def read_folder(cls = 1):
 
 def read_file(name):
 	f = open(name,'r')
-	y = [int(i) for i in f.read().splitlines()]
+	y = [float(i) for i in f.read().splitlines()]
 	return range(len(y)),y
 
 def ops(x,y):
@@ -231,18 +231,13 @@ def dct(x,y):
 		yf.append(0)
 		for j in xf:
 			yf[i]+=((2/N)**.5)*y[j]*math.cos(math.pi*(2*i-1)*(2*j-1)/(4*N))
-	print(yf)
-	n = read(['Samples #'])
-	n = int(n[0])
-	if n>0:
-		sigtofile(xf[:n],yf[:n],'DCT')
+
 	return xf,yf
 
 def unDC(x,y):
 	avg = sum(y)/len(y)
-	print(x)
 	y = [i-avg for i in y]
-	print(y)
+
 	return x,y
 
 def undcfc(x,y):
@@ -464,14 +459,11 @@ def filter(x,y,type,specs):
 	filter = filt(att)
 	if type in ['low','high']:
 		fc = float(specs[3])/Fs
-		print(fc)
 		x2,y2 = fil_apply(filter,width,type,fc)
 	else:
 		f1 = float(specs[3])/Fs
 		f2 = float(specs[4])/Fs
 		x2,y2 = fil_apply(filter,width,type,f1,f2)
-	print(x)
-	print(x2)
 	ans =  convolution(x,y,x2,y2)
 	return ans
 
@@ -519,7 +511,81 @@ def resample(x,y):
 	if M!=0:
 		x,y = down_sample(x,y,M)
 	return x,y
+
+
+
+def proc(y,det,co=-1):
+	x = range(len(y))
+	states = [(x,y)]
+	fs = int(det[0])
+	min_f = int(det[1])
+	max_f = int(det[2])
+	new_fs = int(det[3])
+	specs = [fs,50,500,min_f,max_f]
+	x,y = filter(x,y,'band pass', specs)
+	up_sample(x,y,new_fs)
+	down_sample(x,y,fs)
+	x,y = unDC(x,y)
+	mn = min(y)
+	mx = max(y)
+	old_rng = mx-mn
+	y = [(i-mn)/old_rng*2-1 for i in y]
+
+	y = [p12(y,y,i) for i in range(len(y))]	
+	states.append((x,y))
+	y = y[0:400]
+	x = x[0:400]
+	states.append((x,y))
+	x,y = dct(x,y)
+	if co!=-1:
+		x = x[0:co]
+		y = y[0:co]
+
+	states.append((x,y))
 	
+	return states
+
+def dist():
+	det = read(['Fs','minF','MaxF','new Fs'])
+	states = []
+	co = 0
+	A = read_folder()
+	A = proc(A,det)
+	states.append(A)
+	A = A[-1][-1]
+	B = read_folder()
+	B = proc(B,det)
+	states.append(B)
+	B = B[-1][-1]
+
+	for i in range(len(A)):
+		if A[i]>.02 or B[i]>.02:
+			co = i + 1
+	A = A[0:co]
+	B = B[0:co]
+
+	test = read_folder(0)
+	fs = int(det[0])
+	min_f = int(det[1])
+	max_f = int(det[2])
+	new_fs = int(det[3])
+	if new_fs <max_f*2:
+		display_message('Invalid new fs')
+		return
+	for t in test:
+		states.append(proc(t,det,co))
+	classes = ["Class A", "Class B"]
+	for i in states:
+		y = i[-1][-1]
+		v1 = time_analyze(y,A)[1]
+		v2 = time_analyze(y,B)[1]
+		if v1>v2:
+			classes.append("Class A")
+		else:
+			classes.append("Class B")
+	multi_graph(states,classes)
+	
+
 def graph(x,y):
 	rep = choose(['Digital','Analog']) 
 
@@ -529,7 +595,19 @@ def graph(x,y):
 	if rep =='Analog':	
 		plt.plot(x,y)
 	plt.show()
-	
+
+def multi_graph(X,titles):
+	mx = 0
+	for i in X:
+		if len(i)>mx:
+			mx = len(i)
+	figure, axis = plt.subplots(len(X),mx)
+	for i in range(len(X)):
+		for j in range(len(X[i])):
+			axis[i,j].plot(X[i][j][0],X[i][j][1])
+			axis[i,j].set_title(titles[i])
+	plt.show()
+
 def sigtofile(X,Y,name = 'output'):
 	f = open(name+'.txt','w')
 	f.write('0\n')

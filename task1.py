@@ -23,7 +23,7 @@ while True:
 		x = np.arange(0,10,1/sf)
 		y = [amp*math.cos(2*math.pi*freq*i + ph) for i in x]
 	while True:
-		event = fn.choose(['Apply operation','Graph','Print','Filter','Resample','Exit'])
+		event = fn.choose(['Apply operation','Graph','Print','Filter','Resample','Distinguish','Exit'])
 		if event == 'Apply operation':
 			x,y = fn.ops(x,y)
 		else:
@@ -37,5 +37,7 @@ while True:
 		x,y = fn.FIR(x,y)
 	if event == 'Resample':
 		x,y = fn.resample(x,y)
+	if event == 'Distinguish':
+		x,y = fn.dist()
 	if event == 'Exit':
 		break
